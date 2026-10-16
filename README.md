@@ -18,6 +18,10 @@ generation), and the MCP TypeScript SDK.
 - `cp .env.example .env` and adjust values as needed.
 - Create the database referenced by `DATABASE_URL` (default
   `rag_sourcebook`).
+- Tests use a separate database (`rag_sourcebook_test` by default; override
+  with `TEST_DATABASE_URL`). Create it once with
+  `createdb rag_sourcebook_test` — the suite applies `src/db/schema.sql`
+  itself.
 
 ## Scripts
 
@@ -33,6 +37,7 @@ generation), and the MCP TypeScript SDK.
 | `PORT` | `3000` | HTTP port |
 | `DATABASE_URL` | `postgresql://localhost:5432/rag_sourcebook` | PostgreSQL/pgvector connection string |
 | `CLIENT_ORIGIN` | `http://localhost:5173` | Allowed browser origin for CORS |
+| `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | Local Transformers.js embedding model (384 dimensions; changing it requires a schema update and re-index) |
 
 ## API contract
 
@@ -44,6 +49,7 @@ generation), and the MCP TypeScript SDK.
 
 ## Status
 
-Implemented so far: health route, environment validation, CORS, database pool,
-and base schema. Document ingestion, retrieval/chat, and MCP land in the
-following tasks (see `PLAN.md`).
+Implemented so far: health route, environment validation, CORS, database
+pools, and document ingestion (`POST /api/documents`, `GET /api/documents`)
+with local Transformers.js embeddings and pgvector storage. Retrieval/chat
+and MCP land in the following tasks (see `PLAN.md`).

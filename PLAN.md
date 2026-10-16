@@ -45,11 +45,11 @@ The client keeps matching local TypeScript response types; no shared source fold
 
 **Files:** `src/documents/repository.ts`, `src/documents/ingest.ts`, `src/routes/documents.ts`, `src/documents/ingest.test.ts`, `src/db/schema.sql`.
 
-- [ ] Verify the Transformers.js Node API and selected local sentence-embedding model with current docs; record its vector dimension before creating the pgvector schema.
-- [ ] Write failing tests for empty content, invalid extensions, the 1 MiB limit, metadata preservation, and cleanup after embedding/storage failure.
-- [ ] Run tests and confirm they fail on the missing behavior.
-- [ ] Implement splitting, local embeddings, document metadata persistence, `PGVectorStore` writes, and safe cleanup/transaction behavior.
-- [ ] Verify an indexed chunk and vector using a PostgreSQL integration test with `CREATE EXTENSION vector` enabled.
+- [x] Verify the Transformers.js Node API and selected local sentence-embedding model with current docs; record its vector dimension before creating the pgvector schema.
+- [x] Write failing tests for empty content, invalid extensions, the 1 MiB limit, metadata preservation, and cleanup after embedding/storage failure.
+- [x] Run tests and confirm they fail on the missing behavior.
+- [x] Implement splitting, local embeddings, document metadata persistence, `PGVectorStore` writes, and safe cleanup/transaction behavior.
+- [x] Verify an indexed chunk and vector using a PostgreSQL integration test with `CREATE EXTENSION vector` enabled.
 
 ### 3. Implement retrieval and grounded chat
 

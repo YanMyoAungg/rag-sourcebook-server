@@ -1,4 +1,9 @@
 # esbuild's install script is not needed: the platform binary ships as an
 # optional dependency and tsx/vitest run without it (verified).
+# onnxruntime-node and protobufjs: Transformers.js loaded Xenova/all-MiniLM-L6-v2
+# in Node and produced a 384-dim normalized embedding without their install
+# scripts (verified), so both are explicitly blocked.
 allowBuilds:
   esbuild: false
+  onnxruntime-node: false
+  protobufjs: false
