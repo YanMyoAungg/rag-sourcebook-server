@@ -5,12 +5,11 @@ import {
 } from "@modelcontextprotocol/server";
 import type { Hono } from "hono";
 import type { Pool } from "pg";
-import { z } from "zod";
 import { env } from "../config/env.js";
 import { pool as defaultPool } from "../db/pool.js";
-import { getDocument } from "../documents/repository.js";
-import { SearchValidationError, searchDocuments } from "../rag/search.js";
+import { SearchValidationError } from "../rag/search.js";
 import type { SearchDeps } from "../rag/search.js";
+import { getDocumentTool, searchDocumentsTool } from "../rag/tools.js";
 import { getVectorStore } from "../rag/vector-store.js";
 
 // createMcpHonoApp()'s body parser stashes the parsed JSON body here; the
@@ -34,26 +33,15 @@ export function createMcpServer(deps: McpDeps = defaultMcpDeps()): McpServer {
   const server = new McpServer({ name: "rag-sourcebook", version: "0.1.0" });
 
   server.registerTool(
-    "search_documents",
+    searchDocumentsTool.name,
     {
-      title: "Search documents",
-      description:
-        "Semantic search over the indexed documents. Returns the best-matching " +
-        "chunks with filename, chunk index, relevance, and content.",
-      inputSchema: z.object({
-        query: z.string().min(1).describe("Natural-language search query"),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(20)
-          .optional()
-          .describe("Maximum number of chunks to return (default 5)"),
-      }),
+      title: searchDocumentsTool.title,
+      description: searchDocumentsTool.description,
+      inputSchema: searchDocumentsTool.inputSchema,
     },
-    async ({ query, limit }) => {
+    async (input) => {
       try {
-        const hits = await searchDocuments(query, { limit }, deps.searchDeps);
+        const hits = await searchDocumentsTool.run(input, deps.searchDeps);
         if (hits.length === 0) {
           return {
             content: [{ type: "text" as const, text: "No matching chunks were found." }],
@@ -80,23 +68,21 @@ export function createMcpServer(deps: McpDeps = defaultMcpDeps()): McpServer {
   );
 
   server.registerTool(
-    "get_document",
+    getDocumentTool.name,
     {
-      title: "Get document",
-      description:
-        "Fetch one indexed document by id: metadata plus the full original content.",
-      inputSchema: z.object({
-        documentId: z
-          .string()
-          .describe("Document id (uuid) as returned by search results"),
-      }),
+      title: getDocumentTool.title,
+      description: getDocumentTool.description,
+      inputSchema: getDocumentTool.inputSchema,
     },
-    async ({ documentId }) => {
-      const document = await getDocument(deps.pool, documentId);
+    async (input) => {
+      const document = await getDocumentTool.run(input, { pool: deps.pool });
       if (!document) {
         return {
           content: [
-            { type: "text" as const, text: `No document with id ${documentId}.` },
+            {
+              type: "text" as const,
+              text: `No document with id ${input.documentId}.`,
+            },
           ],
           isError: true,
         };

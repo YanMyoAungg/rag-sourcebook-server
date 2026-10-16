@@ -91,7 +91,26 @@ The client keeps matching local TypeScript response types; no shared source fold
 - [x] Verify one live cited answer and one abstention through the configured endpoint against the Neon corpus.
 - [x] Update `.env.example`, `README.md`, and `render.yaml` with the selected provider, endpoint, and model.
 
+### 7. Share the tool definitions and stream answers with a live trace
+
+**Cause:** the UI should show which tool runs on each question, the way Amazon Q Developer does. Retrieval is currently called in-process by the answer pipeline while `/mcp` wraps the same functions separately, so `search_documents` has two call sites and no single definition, and `POST /api/chat` can only reveal the work after it has finished.
+
+**Files:** `src/rag/tools.ts`, `src/rag/tools.test.ts`, `src/rag/answer.ts`, `src/rag/answer.test.ts`, `src/routes/chat.ts`, `src/routes/chat.test.ts`, `src/mcp/server.ts`, `src/mcp/server.test.ts`, `PLAN.md`.
+
+- [x] Define `search_documents` and `get_document` once in `src/rag/tools.ts` (name, title, description, Zod input schema, run function) and register both MCP tools from those definitions.
+- [x] Keep the MCP registration tests green as the evidence that the extracted contract is unchanged.
+- [x] Write failing tests for the streamed answer: tool-call → tool-result → text deltas → finish, the abstention trace that makes no model call, an upstream model error, and a dropped client connection.
+- [x] Add `POST /api/chat/stream` (Server-Sent Events) emitting those events; leave `POST /api/chat` and its JSON shape unchanged.
+- [x] Run the full suite, typecheck, and build.
+
+### 8. Redeploy and verify the live trace
+
+- [ ] Redeploy the API and confirm `POST /api/chat/stream` streams incrementally through the host's proxy rather than buffering the whole answer.
+- [ ] Confirm the MCP endpoint still lists and runs both tools after the extraction.
+- [ ] Confirm an abstention still makes no model call and shows an empty trace.
+
 ## Out of scope
 
 - Authentication, multi-tenant isolation, PDF parsing, URL crawling, background queues, hybrid search, reranking, LangGraph, and production-scale HNSW tuning.
+- Persisting conversation history; the streamed trace is per request, not stored.
 - A paid embeddings API. If local embeddings cannot run reliably, stop and ask before adding a paid provider.

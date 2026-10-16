@@ -2,11 +2,14 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import { env } from "../config/env.js";
 import {
+  DEFAULT_SEARCH_LIMIT,
   RELEVANCE_THRESHOLD,
   SearchValidationError,
-  searchDocuments,
 } from "./search.js";
 import type { SearchHit } from "./search.js";
+import { searchDocumentsTool } from "./tools.js";
+import type { SearchDocumentsInput } from "./tools.js";
+import { getVectorStore } from "./vector-store.js";
 
 export class ChatModelNotConfiguredError extends Error {
   constructor(message: string) {
@@ -37,15 +40,47 @@ export interface ChatResult {
   retrievedChunks: SearchHit[];
 }
 
-/** The one model operation answering needs, kept narrow for testability. */
+/** A retrieval hit as the trace reports it: no content, so the stream stays small. */
+export interface TraceHit {
+  filename: string;
+  chunkIndex: number;
+  relevance: number;
+}
+
+/**
+ * One tool call in an answer's trace. The same `id` is emitted twice, running
+ * then complete, so a client can update the row in place as it fills in.
+ */
+export interface ToolTrace {
+  id: string;
+  /** The tool's registered name, as an MCP client would call it. */
+  tool: string;
+  args: Record<string, unknown>;
+  state: "running" | "complete" | "error";
+  hits?: TraceHit[];
+  durationMs?: number;
+}
+
+/** What `streamAnswer` yields, in order. */
+export type AnswerEvent =
+  | { type: "tool"; step: ToolTrace }
+  | { type: "text-delta"; text: string }
+  | { type: "finish"; result: ChatResult; durationMs: number };
+
+/**
+ * The one model operation answering needs, kept narrow for testability: a
+ * stream of chunks, so a client can render the answer as it arrives.
+ */
 export interface AnswerModel {
-  invoke(messages: Array<SystemMessage | HumanMessage>): Promise<{
-    content: unknown;
-  }>;
+  stream(
+    messages: Array<SystemMessage | HumanMessage>,
+    options?: { signal?: AbortSignal },
+  ): Promise<AsyncIterable<{ content: unknown }>>;
 }
 
 export interface AnswerDeps {
-  search: (query: string) => Promise<SearchHit[]>;
+  /** Runs the `search_documents` tool and applies the answering threshold. */
+  search: (input: SearchDocumentsInput) => Promise<SearchHit[]>;
   getModel: () => AnswerModel;
 }
 
@@ -58,6 +93,7 @@ const CHAT_TIMEOUT_MS = 45_000;
 const MAX_ANSWER_TOKENS = 800;
 const APP_USER_AGENT = "rag-sourcebook-server/0.1.0";
 const CITATION_PATTERN = /\[chunk-(\d+)\]/g;
+const TOOL_STEP_ID = "step-1";
 
 const SYSTEM_PROMPT = [
   "You answer questions strictly from the numbered evidence excerpts provided.",
@@ -124,8 +160,10 @@ export function resolveChatModelConfig(
 
 function defaultDeps(): AnswerDeps {
   return {
-    search: (query) =>
-      searchDocuments(query, { minRelevance: RELEVANCE_THRESHOLD }),
+    search: async (input) => {
+      const hits = await searchDocumentsTool.run(input, { getVectorStore });
+      return hits.filter((hit) => hit.relevance >= RELEVANCE_THRESHOLD);
+    },
     getModel: getChatModel,
   };
 }
@@ -155,49 +193,16 @@ function extractText(content: unknown): string {
   return "";
 }
 
-export async function answerQuestion(
-  question: string,
-  deps: AnswerDeps = defaultDeps(),
-): Promise<ChatResult> {
-  const trimmedQuestion = question.trim();
-  if (trimmedQuestion.length === 0) {
-    throw new SearchValidationError("question must not be empty");
-  }
+function toTraceHit(hit: SearchHit): TraceHit {
+  return {
+    filename: hit.filename,
+    chunkIndex: hit.chunkIndex,
+    relevance: hit.relevance,
+  };
+}
 
-  const hits = await deps.search(trimmedQuestion);
-  if (hits.length === 0) {
-    return { answer: ABSTENTION_ANSWER, citations: [], retrievedChunks: [] };
-  }
-
-  const model = deps.getModel();
-
-  const evidence = hits
-    .map(
-      (hit, index) =>
-        `[chunk-${index + 1}] (${hit.filename}, chunk ${hit.chunkIndex}):\n${hit.content}`,
-    )
-    .join("\n\n");
-
-  let content: unknown;
-  try {
-    const response = await model.invoke([
-      new SystemMessage(SYSTEM_PROMPT),
-      new HumanMessage(
-        `Evidence:\n${evidence}\n\nQuestion: ${trimmedQuestion}`,
-      ),
-    ]);
-    content = response.content;
-  } catch (error) {
-    throw new ChatGenerationError("answer generation failed", {
-      cause: error,
-    });
-  }
-
-  const answer = extractText(content);
-  if (answer.trim().length === 0) {
-    throw new ChatGenerationError("model returned an empty answer");
-  }
-
+/** Maps the `[chunk-N]` markers an answer uses onto the chunks it was given. */
+function toCitations(answer: string, hits: SearchHit[]): Citation[] {
   const citations: Citation[] = [];
   const seen = new Set<number>();
   for (const match of answer.matchAll(CITATION_PATTERN)) {
@@ -218,6 +223,131 @@ export async function answerQuestion(
       chunkIndex: hit.chunkIndex,
     });
   }
+  return citations;
+}
 
-  return { answer, citations, retrievedChunks: hits };
+/**
+ * Answers one question, yielding the trace as it happens: the search tool call,
+ * then the answer's text as the model produces it, then the finished result.
+ *
+ * Throws rather than yielding an error event, so the JSON route keeps mapping
+ * failures to status codes and the streaming route can report them on a
+ * response whose headers are already sent.
+ */
+export async function* streamAnswer(
+  question: string,
+  deps: AnswerDeps = defaultDeps(),
+  options: { signal?: AbortSignal } = {},
+): AsyncGenerator<AnswerEvent> {
+  const trimmedQuestion = question.trim();
+  if (trimmedQuestion.length === 0) {
+    throw new SearchValidationError("question must not be empty");
+  }
+
+  const startedAt = Date.now();
+  const call: SearchDocumentsInput = {
+    query: trimmedQuestion,
+    limit: DEFAULT_SEARCH_LIMIT,
+  };
+  const tool = { id: TOOL_STEP_ID, tool: searchDocumentsTool.name, args: call };
+
+  yield { type: "tool", step: { ...tool, state: "running" } };
+
+  const searchStartedAt = Date.now();
+  let hits: SearchHit[];
+  try {
+    hits = await deps.search(call);
+  } catch (error) {
+    yield {
+      type: "tool",
+      step: {
+        ...tool,
+        state: "error",
+        durationMs: Date.now() - searchStartedAt,
+      },
+    };
+    throw error;
+  }
+
+  yield {
+    type: "tool",
+    step: {
+      ...tool,
+      state: "complete",
+      hits: hits.map(toTraceHit),
+      durationMs: Date.now() - searchStartedAt,
+    },
+  };
+
+  if (hits.length === 0) {
+    yield {
+      type: "finish",
+      result: { answer: ABSTENTION_ANSWER, citations: [], retrievedChunks: [] },
+      durationMs: Date.now() - startedAt,
+    };
+    return;
+  }
+
+  const model = deps.getModel();
+
+  const evidence = hits
+    .map(
+      (hit, index) =>
+        `[chunk-${index + 1}] (${hit.filename}, chunk ${hit.chunkIndex}):\n${hit.content}`,
+    )
+    .join("\n\n");
+
+  let answer = "";
+  try {
+    const chunks = await model.stream(
+      [
+        new SystemMessage(SYSTEM_PROMPT),
+        new HumanMessage(`Evidence:\n${evidence}\n\nQuestion: ${trimmedQuestion}`),
+      ],
+      { signal: options.signal },
+    );
+    for await (const chunk of chunks) {
+      const text = extractText(chunk.content);
+      if (text.length === 0) {
+        continue;
+      }
+      answer += text;
+      yield { type: "text-delta", text };
+    }
+  } catch (error) {
+    throw new ChatGenerationError("answer generation failed", {
+      cause: error,
+    });
+  }
+
+  if (answer.trim().length === 0) {
+    throw new ChatGenerationError("model returned an empty answer");
+  }
+
+  yield {
+    type: "finish",
+    result: {
+      answer,
+      citations: toCitations(answer, hits),
+      retrievedChunks: hits,
+    },
+    durationMs: Date.now() - startedAt,
+  };
+}
+
+/**
+ * The buffered form of `streamAnswer`, for callers that only want the result:
+ * `POST /api/chat` and its tests.
+ */
+export async function answerQuestion(
+  question: string,
+  deps: AnswerDeps = defaultDeps(),
+): Promise<ChatResult> {
+  for await (const event of streamAnswer(question, deps)) {
+    if (event.type === "finish") {
+      return event.result;
+    }
+  }
+  // streamAnswer always ends with a finish event, or throws.
+  throw new ChatGenerationError("answer stream ended without a result");
 }

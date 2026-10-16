@@ -5,9 +5,10 @@ import {
   ChatModelNotConfiguredError,
   answerQuestion,
   resolveChatModelConfig,
+  streamAnswer,
 } from "./answer.js";
-import type { AnswerDeps, ChatSettingsSource } from "./answer.js";
-import { SearchValidationError } from "./search.js";
+import type { AnswerDeps, AnswerEvent, ChatSettingsSource } from "./answer.js";
+import { DEFAULT_SEARCH_LIMIT, SearchValidationError } from "./search.js";
 import type { SearchHit } from "./search.js";
 
 const sampleHit = (overrides: Partial<SearchHit> = {}): SearchHit => ({
@@ -19,27 +20,49 @@ const sampleHit = (overrides: Partial<SearchHit> = {}): SearchHit => ({
   ...overrides,
 });
 
-type ModelScript = (messages: unknown[]) => string | Promise<string>;
+type ModelScript = (
+  messages: unknown[],
+) => string | string[] | Promise<string | string[]>;
 
 /**
- * Test deps with a scripted model. When no script is given the model must not
- * be called; doing so fails the test through the thrown error.
+ * Test deps with a scripted model that emits the script one chunk at a time.
+ * When no script is given the model must not be called; doing so fails the test
+ * through the thrown error.
  */
 function makeDeps(hits: SearchHit[], script?: ModelScript) {
   const modelCalls: unknown[][] = [];
+  const modelSignals: Array<AbortSignal | undefined> = [];
+  const searches: unknown[] = [];
   const deps: AnswerDeps = {
-    search: async () => hits,
+    search: async (input) => {
+      searches.push(input);
+      return hits;
+    },
     getModel: () => ({
-      invoke: async (messages) => {
+      stream: async (messages, options) => {
         modelCalls.push(messages);
+        modelSignals.push(options?.signal);
         if (!script) {
           throw new Error("model must not be called");
         }
-        return { content: await script(messages) };
+        const scripted = await script(messages);
+        return (async function* () {
+          for (const text of Array.isArray(scripted) ? scripted : [scripted]) {
+            yield { content: text };
+          }
+        })();
       },
     }),
   };
-  return { deps, modelCalls };
+  return { deps, modelCalls, modelSignals, searches };
+}
+
+async function collect(events: AsyncGenerator<AnswerEvent>) {
+  const collected: AnswerEvent[] = [];
+  for await (const event of events) {
+    collected.push(event);
+  }
+  return collected;
 }
 
 describe("answerQuestion", () => {
@@ -167,6 +190,134 @@ describe("answerQuestion", () => {
     await expect(answerQuestion("q", deps)).rejects.toBeInstanceOf(
       ChatGenerationError,
     );
+  });
+});
+
+describe("streamAnswer", () => {
+  it("traces one search_documents call, then streams the answer, then finishes", async () => {
+    const hits = [sampleHit()];
+    const { deps } = makeDeps(hits, () => [
+      "Cells need ",
+      "mitochondria [chunk-1].",
+    ]);
+
+    const events = await collect(streamAnswer("What powers the cell?", deps));
+
+    expect(events.map((event) => event.type)).toEqual([
+      "tool",
+      "tool",
+      "text-delta",
+      "text-delta",
+      "finish",
+    ]);
+
+    const [running, complete] = events as [
+      Extract<AnswerEvent, { type: "tool" }>,
+      Extract<AnswerEvent, { type: "tool" }>,
+    ];
+    expect(running.step).toMatchObject({
+      tool: "search_documents",
+      args: { query: "What powers the cell?", limit: DEFAULT_SEARCH_LIMIT },
+      state: "running",
+    });
+    // The completing event updates the row the running event opened.
+    expect(complete.step.id).toBe(running.step.id);
+    expect(complete.step.state).toBe("complete");
+    expect(complete.step.hits).toEqual([
+      { filename: "handbook.md", chunkIndex: 0, relevance: 0.82 },
+    ]);
+    expect(complete.step.durationMs).toBeGreaterThanOrEqual(0);
+
+    const finish = events.at(-1)!;
+    expect(finish).toMatchObject({
+      type: "finish",
+      result: {
+        answer: "Cells need mitochondria [chunk-1].",
+        citations: [
+          {
+            documentId: "f1e2d3c4-0000-4000-8000-000000000001",
+            filename: "handbook.md",
+            chunkIndex: 0,
+          },
+        ],
+        retrievedChunks: hits,
+      },
+    });
+  });
+
+  it("traces an empty search and abstains without calling the model", async () => {
+    const { deps, modelCalls } = makeDeps([]);
+
+    const events = await collect(streamAnswer("  What powers the cell?  ", deps));
+
+    expect(events.map((event) => event.type)).toEqual(["tool", "tool", "finish"]);
+    expect(events[1]).toMatchObject({
+      type: "tool",
+      step: { state: "complete", hits: [] },
+    });
+    expect(events[2]).toMatchObject({
+      type: "finish",
+      result: { answer: ABSTENTION_ANSWER, citations: [], retrievedChunks: [] },
+    });
+    expect(modelCalls).toHaveLength(0);
+  });
+
+  it("searches with the trimmed question", async () => {
+    const { deps, searches } = makeDeps([sampleHit()], () => "ok [chunk-1]");
+
+    await collect(streamAnswer("  Where is it?  ", deps));
+
+    expect(searches).toEqual([
+      { query: "Where is it?", limit: DEFAULT_SEARCH_LIMIT },
+    ]);
+  });
+
+  it("passes the request's abort signal to the model", async () => {
+    const controller = new AbortController();
+    const { deps, modelSignals } = makeDeps([sampleHit()], () => "ok [chunk-1]");
+
+    await collect(streamAnswer("q", deps, { signal: controller.signal }));
+
+    expect(modelSignals).toEqual([controller.signal]);
+  });
+
+  it("marks the tool step as failed and rethrows when retrieval throws", async () => {
+    const deps: AnswerDeps = {
+      search: async () => {
+        throw new Error("vector store unavailable");
+      },
+      getModel: () => {
+        throw new Error("model must not be called");
+      },
+    };
+
+    const events: AnswerEvent[] = [];
+    await expect(
+      (async () => {
+        for await (const event of streamAnswer("q", deps)) {
+          events.push(event);
+        }
+      })(),
+    ).rejects.toThrow("vector store unavailable");
+
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      type: "tool",
+      step: { tool: "search_documents", state: "running" },
+    });
+    expect(events[1]).toMatchObject({
+      type: "tool",
+      step: { tool: "search_documents", state: "error" },
+    });
+  });
+
+  it("stops on an empty question before searching", async () => {
+    const { deps, searches } = makeDeps([sampleHit()]);
+
+    await expect(collect(streamAnswer("   ", deps))).rejects.toBeInstanceOf(
+      SearchValidationError,
+    );
+    expect(searches).toHaveLength(0);
   });
 });
 
