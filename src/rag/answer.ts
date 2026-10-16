@@ -1,6 +1,5 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
-import { randomUUID } from "node:crypto";
 import { env } from "../config/env.js";
 import {
   RELEVANCE_THRESHOLD,
@@ -51,6 +50,11 @@ export interface AnswerDeps {
 }
 
 const CHAT_TIMEOUT_MS = 45_000;
+// Reasoning models spend part of this budget on hidden reasoning before any
+// content is emitted, so it must cover reasoning + answer. Too small a budget
+// returns an empty answer rather than a short one (verified against OpenRouter
+// free reasoning models, which returned content: null at max_tokens 60 and a
+// complete cited answer at 800).
 const MAX_ANSWER_TOKENS = 800;
 const APP_USER_AGENT = "rag-sourcebook-server/0.1.0";
 const CITATION_PATTERN = /\[chunk-(\d+)\]/g;
@@ -63,32 +67,59 @@ const SYSTEM_PROMPT = [
 ].join(" ");
 
 let defaultModel: ChatOpenAI | undefined;
-// OpenCode Go asks direct API clients to send a stable session id per
-// conversation; this server is stateless, so one id per process.
-const openCodeSessionId = randomUUID();
 
 function getChatModel(): AnswerModel {
-  if (env.CHAT_MODEL.length === 0 || !env.OPENCODE_INFERENCE_API_KEY) {
+  const config = resolveChatModelConfig(env);
+  if (!config) {
     throw new ChatModelNotConfiguredError(
-      "chat model is not configured: set CHAT_MODEL and OPENCODE_INFERENCE_API_KEY",
+      "chat model is not configured: set CHAT_BASE_URL, CHAT_API_KEY and CHAT_MODEL",
     );
   }
   defaultModel ??= new ChatOpenAI({
-    model: env.CHAT_MODEL,
-    apiKey: env.OPENCODE_INFERENCE_API_KEY,
+    model: config.model,
+    apiKey: config.apiKey,
     temperature: 0,
     maxTokens: MAX_ANSWER_TOKENS,
     timeout: CHAT_TIMEOUT_MS,
     maxRetries: 1,
     configuration: {
-      baseURL: env.OPENCODE_INFERENCE_BASE_URL,
+      baseURL: config.baseUrl,
       defaultHeaders: {
         "user-agent": APP_USER_AGENT,
-        "x-opencode-session": openCodeSessionId,
       },
     },
   });
   return defaultModel;
+}
+
+export interface ChatModelConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+/** The chat settings the server reads. Env-shaped so tests can inject one. */
+export interface ChatSettingsSource {
+  CHAT_BASE_URL?: string | undefined;
+  CHAT_API_KEY?: string | undefined;
+  CHAT_MODEL?: string | undefined;
+}
+
+/**
+ * Resolves chat settings from an env-shaped source. Any missing or blank value
+ * means chat is unconfigured, which surfaces as "not configured" (503) rather
+ * than a failed request to a half-specified endpoint.
+ */
+export function resolveChatModelConfig(
+  source: ChatSettingsSource,
+): ChatModelConfig | undefined {
+  const baseUrl = source.CHAT_BASE_URL?.trim() ?? "";
+  const apiKey = source.CHAT_API_KEY?.trim() ?? "";
+  const model = source.CHAT_MODEL?.trim() ?? "";
+  if (baseUrl.length === 0 || apiKey.length === 0 || model.length === 0) {
+    return undefined;
+  }
+  return { baseUrl, apiKey, model };
 }
 
 function defaultDeps(): AnswerDeps {

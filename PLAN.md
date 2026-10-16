@@ -4,7 +4,7 @@
 
 **Architecture:** This is a standalone Node.js TypeScript project with its own Git history and dependencies. It exposes REST endpoints for the client and an MCP Streamable HTTP endpoint for MCP clients. Both use the same document and retrieval services.
 
-**Stack:** Hono, `@hono/node-server`, `@hono/zod-validator`, Zod, Hono's `cors` middleware, PostgreSQL/pgvector, `pg`, LangChain.js (`@langchain/core`, `@langchain/textsplitters`, `@langchain/pgvector`, `@langchain/openai`), Transformers.js (`@huggingface/transformers`) for local sentence embeddings, OpenCode Inference, official MCP TypeScript SDK Hono/server/client/node packages, dotenv, Vitest, pnpm.
+**Stack:** Hono, `@hono/node-server`, `@hono/zod-validator`, Zod, Hono's `cors` middleware, PostgreSQL/pgvector, `pg`, LangChain.js (`@langchain/core`, `@langchain/textsplitters`, `@langchain/pgvector`, `@langchain/openai`), Transformers.js (`@huggingface/transformers`) for local sentence embeddings, an OpenAI-compatible chat provider (Gemini free tier), official MCP TypeScript SDK Hono/server/client/node packages, dotenv, Vitest, pnpm.
 
 ## API contract provided
 
@@ -15,18 +15,18 @@ The client keeps matching local TypeScript response types; no shared source fold
 - `POST /api/documents` accepts JSON `{ filename: string; content: string }` and returns the indexed document summary.
 - `POST /api/chat` accepts `{ question: string }` and returns `{ answer: string; citations: Citation[]; retrievedChunks: SearchHit[] }`.
 - `/mcp` exposes `search_documents({ query, limit? })` and `get_document({ documentId })`.
-- Configure `CLIENT_ORIGIN`, `DATABASE_URL`, embedding configuration, OpenCode Inference URL/model, and any credential through environment variables.
+- Configure `CLIENT_ORIGIN`, `DATABASE_URL`, embedding configuration, the chat provider's base URL/key/model, and any credential through environment variables.
 
 ## Constraints
 
 - Accept only `.txt` and `.md` documents up to 1 MiB; reject empty or unsupported uploads.
 - Store original document content and metadata separately from chunk vectors. Chunk metadata includes document ID, filename, and chunk index.
 - Determine the local embedding model and dimension from current docs before creating the vector schema; re-index if the embedding model changes.
-- Select a free OpenCode Inference model ID from its live model list. Do not assume the UI label is the API ID.
+- Select a free model ID from the configured chat provider's live model list. Do not assume the UI label is the API ID.
 - Normalize retrieval relevance so larger values mean more relevant; calibrate an abstention threshold against three answerable and three unrelated questions.
 - Keep secrets out of Git. Use `.env.example` only.
 - Use SQL schema/migration files and the `pg` driver; do not add an ORM for this demo.
-- Use `@langchain/openai` with OpenCode's OpenAI-compatible chat endpoint; verify the current custom base URL configuration before implementation.
+- Use `@langchain/openai` against the configured provider's OpenAI-compatible chat endpoint; verify the current custom base URL configuration before implementation. The base URL carries no trailing slash, since LangChain appends `/chat/completions`.
 - Keep API input schemas and environment validation in the server repository with Zod; no shared package is required.
 - Backend host and hosted PostgreSQL provider are selected after comparing current pricing, Node runtime, pgvector support, and connection requirements. Do not tie application code to one provider.
 
@@ -77,6 +77,19 @@ The client keeps matching local TypeScript response types; no shared source fold
 - [ ] Compare current backend-host and managed PostgreSQL options for cost, Node support, pgvector support, connection limits, and sleep behavior; record the selected provider before deployment.
 - [ ] Deploy the API and database, configure environment secrets, and confirm health, upload, chat, and MCP endpoint access over HTTPS.
 - [ ] Run an integration smoke test from the deployed Vercel client.
+
+### 6. Replace the expired OpenCode Inference provider
+
+**Cause:** the OpenCode Go subscription behind the configured key expired; the free tier is client-only by policy (`FreeTierError`, verified live), so OpenCode Inference can no longer serve this server on a free plan.
+
+**Files:** `src/config/env.ts`, `src/rag/answer.ts`, `src/rag/answer.test.ts`, `.env.example`, `README.md`, `render.yaml`.
+
+- [x] Rename `OPENCODE_INFERENCE_BASE_URL`/`OPENCODE_INFERENCE_API_KEY` to provider-neutral `CHAT_BASE_URL`/`CHAT_API_KEY`, and drop the vendor defaults so no provider is baked into the code.
+- [x] Remove the OpenCode-specific `x-opencode-session` header.
+- [x] Extract `resolveChatModelConfig` and cover it with tests (provider-agnostic names, missing/blank values report unconfigured).
+- [x] Select a free model from the live model list once a key is configured. Gemini was ruled out (Google AI Studio is region-blocked for the user), so the selection is OpenRouter's `nvidia/nemotron-3-super-120b-a12b:free`.
+- [x] Verify one live cited answer and one abstention through the configured endpoint against the Neon corpus.
+- [x] Update `.env.example`, `README.md`, and `render.yaml` with the selected provider, endpoint, and model.
 
 ## Out of scope
 

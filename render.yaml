@@ -2,9 +2,9 @@
 #
 # Secrets marked `sync: false` are prompted for on first apply and can be set
 # later in the dashboard:
-#   DATABASE_URL               — Neon connection string (postgresql://…?sslmode=require)
-#   OPENCODE_INFERENCE_API_KEY — OpenCode Go key (https://opencode.ai/console)
-#   CLIENT_ORIGIN              — the deployed client origin, once the client ships
+#   DATABASE_URL  — Neon connection string (postgresql://…?sslmode=require)
+#   CHAT_API_KEY  — OpenRouter API key (https://openrouter.ai/keys)
+#   CLIENT_ORIGIN — the deployed client origin, once the client ships
 #
 # MCP_ALLOWED_HOSTS is not set here: on Render the server uses the service's
 # own hostname (RENDER_EXTERNAL_HOSTNAME) for MCP host-header validation.
@@ -20,13 +20,13 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
-      - key: OPENCODE_INFERENCE_API_KEY
+      - key: CHAT_API_KEY
         sync: false
       - key: CLIENT_ORIGIN
         sync: false
-      - key: OPENCODE_INFERENCE_BASE_URL
-        value: https://opencode.ai/inference/go/openai/v1
+      - key: CHAT_BASE_URL
+        value: https://openrouter.ai/api/v1
       - key: CHAT_MODEL
-        value: cat-jam-free
+        value: nvidia/nemotron-3-super-120b-a12b:free
       - key: EMBEDDING_MODEL
         value: Xenova/all-MiniLM-L6-v2

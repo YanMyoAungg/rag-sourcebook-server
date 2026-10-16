@@ -38,9 +38,28 @@ generation), and the MCP TypeScript SDK.
 | `DATABASE_URL` | `postgresql://localhost:5432/rag_sourcebook` | PostgreSQL/pgvector connection string |
 | `CLIENT_ORIGIN` | `http://localhost:5173` | Allowed browser origin for CORS |
 | `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | Local Transformers.js embedding model (384 dimensions; changing it requires a schema update and re-index) |
-| `OPENCODE_INFERENCE_BASE_URL` | `https://opencode.ai/inference/go/openai/v1` | OpenAI-compatible inference endpoint (OpenCode Go) |
-| `OPENCODE_INFERENCE_API_KEY` | – | Inference key; chat answers report 503 while unset |
-| `CHAT_MODEL` | `cat-jam-free` | Free model ID, selected from the live model list |
+| `CHAT_BASE_URL` | – | OpenAI-compatible chat endpoint. No vendor default: unset means chat reports 503 |
+| `CHAT_API_KEY` | – | Provider API key; chat answers report 503 while unset |
+| `CHAT_MODEL` | – | Model ID; currently `nvidia/nemotron-3-super-120b-a12b:free` (OpenRouter) |
+
+### Generation provider
+
+Any OpenAI-compatible endpoint works — the base URL, key, and model are
+environment configuration, so the provider can change without touching code
+(OpenCode's free tier is client-only by policy, which is why the server does
+not use it). The current setup is OpenRouter's free tier:
+
+- Base URL `https://openrouter.ai/api/v1`, key from <https://openrouter.ai/keys>.
+- Free models need only an email account (no card) and are capped at
+  20 requests/minute and 50/day; a one-time $10 credit purchase raises the daily
+  cap to 1000. The deployed service shares that quota with local runs.
+- Free models are logged by their providers and may be used to train them — fine
+  for demo documents, not for anything confidential.
+- Pin a specific model rather than the `openrouter/free` router, which picks a
+  different model per request and makes answers non-reproducible. Reasoning
+  models spend part of the 800-token answer budget on hidden reasoning before
+  emitting content; below that budget they return an empty answer, which the
+  server reports as a generation failure (502).
 
 ## API contract
 
@@ -82,7 +101,7 @@ One-time setup:
 2. **GitHub** — push this repository to GitHub.
 3. **Render** — create a Blueprint from the repository (`render.yaml` is
    included). Render prompts for the `sync: false` secrets: `DATABASE_URL`
-   (Neon) and `OPENCODE_INFERENCE_API_KEY`; set `CLIENT_ORIGIN` once the
+   (Neon) and `CHAT_API_KEY` (OpenRouter); set `CLIENT_ORIGIN` once the
    client is deployed.
 4. **Schema** — apply it to the Neon database once:
    `psql "postgresql://…?sslmode=require" -f src/db/schema.sql`

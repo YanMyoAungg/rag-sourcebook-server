@@ -4,8 +4,9 @@ import {
   ChatGenerationError,
   ChatModelNotConfiguredError,
   answerQuestion,
+  resolveChatModelConfig,
 } from "./answer.js";
-import type { AnswerDeps } from "./answer.js";
+import type { AnswerDeps, ChatSettingsSource } from "./answer.js";
 import { SearchValidationError } from "./search.js";
 import type { SearchHit } from "./search.js";
 
@@ -166,5 +167,45 @@ describe("answerQuestion", () => {
     await expect(answerQuestion("q", deps)).rejects.toBeInstanceOf(
       ChatGenerationError,
     );
+  });
+});
+
+describe("resolveChatModelConfig", () => {
+  const configured: ChatSettingsSource = {
+    CHAT_BASE_URL: "https://example.test/v1",
+    CHAT_API_KEY: "test-key",
+    CHAT_MODEL: "test-model",
+  };
+
+  it("reads the provider-agnostic chat settings", () => {
+    expect(resolveChatModelConfig(configured)).toEqual({
+      baseUrl: "https://example.test/v1",
+      apiKey: "test-key",
+      model: "test-model",
+    });
+  });
+
+  it("reports a missing base URL as unconfigured", () => {
+    expect(
+      resolveChatModelConfig({ ...configured, CHAT_BASE_URL: undefined }),
+    ).toBeUndefined();
+  });
+
+  it("reports a missing API key as unconfigured", () => {
+    expect(
+      resolveChatModelConfig({ ...configured, CHAT_API_KEY: undefined }),
+    ).toBeUndefined();
+  });
+
+  it("reports a missing model as unconfigured", () => {
+    expect(
+      resolveChatModelConfig({ ...configured, CHAT_MODEL: undefined }),
+    ).toBeUndefined();
+  });
+
+  it("treats blank settings as unconfigured", () => {
+    expect(
+      resolveChatModelConfig({ ...configured, CHAT_API_KEY: "   " }),
+    ).toBeUndefined();
   });
 });

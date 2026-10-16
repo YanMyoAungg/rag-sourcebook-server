@@ -9,13 +9,12 @@ const envSchema = z.object({
     .default("postgresql://localhost:5432/rag_sourcebook"),
   CLIENT_ORIGIN: z.string().min(1).default("http://localhost:5173"),
   EMBEDDING_MODEL: z.string().min(1).default("Xenova/all-MiniLM-L6-v2"),
-  OPENCODE_INFERENCE_BASE_URL: z
-    .string()
-    .min(1)
-    .default("https://opencode.ai/inference/go/openai/v1"),
-  // Optional at boot; chat answers are reported as "not configured" without it.
-  OPENCODE_INFERENCE_API_KEY: z.string().optional(),
-  CHAT_MODEL: z.string().default("cat-jam-free"),
+  // Chat generation goes through any OpenAI-compatible endpoint, so no
+  // provider is baked in as a default: unset values mean chat answers report
+  // "not configured" (503) until a provider is configured.
+  CHAT_BASE_URL: z.string().optional(),
+  CHAT_API_KEY: z.string().optional(),
+  CHAT_MODEL: z.string().optional(),
   // Comma-separated hostnames accepted by the MCP endpoint's host-header
   // validation. Unset: localhost-class hosts only (dev default).
   MCP_ALLOWED_HOSTS: z.string().optional(),
