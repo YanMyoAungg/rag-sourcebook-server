@@ -94,6 +94,9 @@ Target setup: a Render free web service + Neon free PostgreSQL (both $0). The
 free instance spins down after ~15 minutes idle; the next request takes about
 a minute to wake it.
 
+Live now: <https://rag-sourcebook-server.onrender.com> — Render free tier,
+Neon in Singapore, OpenRouter free tier for generation.
+
 One-time setup:
 
 1. **Neon** — create a project at neon.com and copy the connection string

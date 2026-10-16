@@ -74,8 +74,8 @@ The client keeps matching local TypeScript response types; no shared source fold
 ### 5. Verify and deploy the server
 
 - [x] Run unit and PostgreSQL integration tests; confirm CORS accepts the configured client origin and rejects other origins.
-- [ ] Compare current backend-host and managed PostgreSQL options for cost, Node support, pgvector support, connection limits, and sleep behavior; record the selected provider before deployment.
-- [ ] Deploy the API and database, configure environment secrets, and confirm health, upload, chat, and MCP endpoint access over HTTPS.
+- [x] Compare current backend-host and managed PostgreSQL options for cost, Node support, pgvector support, connection limits, and sleep behavior; record the selected provider before deployment.
+- [x] Deploy the API and database, configure environment secrets, and confirm health, upload, chat, and MCP endpoint access over HTTPS.
 - [ ] Run an integration smoke test from the deployed Vercel client.
 
 ### 6. Replace the expired OpenCode Inference provider
