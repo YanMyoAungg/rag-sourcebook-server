@@ -105,9 +105,9 @@ The client keeps matching local TypeScript response types; no shared source fold
 
 ### 8. Redeploy and verify the live trace
 
-- [ ] Redeploy the API and confirm `POST /api/chat/stream` streams incrementally through the host's proxy rather than buffering the whole answer.
-- [ ] Confirm the MCP endpoint still lists and runs both tools after the extraction.
-- [ ] Confirm an abstention still makes no model call and shows an empty trace.
+- [x] Redeploy the API and confirm `POST /api/chat/stream` streams incrementally through the host's proxy rather than buffering the whole answer.
+- [x] Confirm the MCP endpoint still lists and runs both tools after the extraction.
+- [x] Confirm an abstention still makes no model call and shows an empty trace.
 
 ## Out of scope
 
