@@ -55,11 +55,11 @@ The client keeps matching local TypeScript response types; no shared source fold
 
 **Files:** `src/rag/search.ts`, `src/rag/answer.ts`, `src/routes/chat.ts`, `src/rag/search.test.ts`, `src/rag/answer.test.ts`.
 
-- [ ] Test empty queries, no results, below-threshold retrieval, citation mapping, missing model configuration, and model timeout/error behavior.
-- [ ] Implement ranked similarity search with source metadata and a calibrated relevance threshold.
-- [ ] Query the OpenCode live model list and configure a free available chat model through LangChain’s compatible integration.
-- [ ] Generate answers from retrieved evidence only; validate citation IDs against retrieved chunks and abstain below threshold without calling the model.
-- [ ] Verify with a seeded corpus and one live free-model request.
+- [x] Test empty queries, no results, below-threshold retrieval, citation mapping, missing model configuration, and model timeout/error behavior.
+- [x] Implement ranked similarity search with source metadata and a calibrated relevance threshold.
+- [x] Query the OpenCode live model list and configure a free available chat model through LangChain’s compatible integration.
+- [x] Generate answers from retrieved evidence only; validate citation IDs against retrieved chunks and abstain below threshold without calling the model.
+- [x] Verify with a seeded corpus and one live free-model request.
 
 ### 4. Implement the MCP server and client smoke test
 

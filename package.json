@@ -19,6 +19,7 @@
     "@hono/zod-validator": "^0.9.1",
     "@huggingface/transformers": "^4.3.1",
     "@langchain/core": "^1.2.17",
+    "@langchain/openai": "^1.6.2",
     "@langchain/pgvector": "^0.1.0",
     "@langchain/textsplitters": "^1.0.2",
     "dotenv": "^18.0.8",

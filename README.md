@@ -38,6 +38,9 @@ generation), and the MCP TypeScript SDK.
 | `DATABASE_URL` | `postgresql://localhost:5432/rag_sourcebook` | PostgreSQL/pgvector connection string |
 | `CLIENT_ORIGIN` | `http://localhost:5173` | Allowed browser origin for CORS |
 | `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | Local Transformers.js embedding model (384 dimensions; changing it requires a schema update and re-index) |
+| `OPENCODE_INFERENCE_BASE_URL` | `https://opencode.ai/inference/go/openai/v1` | OpenAI-compatible inference endpoint (OpenCode Go) |
+| `OPENCODE_INFERENCE_API_KEY` | – | Inference key; chat answers report 503 while unset |
+| `CHAT_MODEL` | `cat-jam-free` | Free model ID, selected from the live model list |
 
 ## API contract
 
@@ -50,6 +53,7 @@ generation), and the MCP TypeScript SDK.
 ## Status
 
 Implemented so far: health route, environment validation, CORS, database
-pools, and document ingestion (`POST /api/documents`, `GET /api/documents`)
-with local Transformers.js embeddings and pgvector storage. Retrieval/chat
-and MCP land in the following tasks (see `PLAN.md`).
+pools, document ingestion (`POST /api/documents`, `GET /api/documents`) with
+local Transformers.js embeddings and pgvector storage, and grounded chat
+(`POST /api/chat`) with citations and below-threshold abstention. MCP lands in
+the next task (see `PLAN.md`).
