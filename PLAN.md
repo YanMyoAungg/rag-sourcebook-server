@@ -65,11 +65,11 @@ The client keeps matching local TypeScript response types; no shared source fold
 
 **Files:** `src/mcp/server.ts`, `src/mcp/server.test.ts`, `scripts/mcp-smoke.ts`, `src/app.ts`.
 
-- [ ] Test tool registration, valid search, document lookup, and invalid argument handling.
-- [ ] Mount the official MCP TypeScript SDK Hono integration at `/mcp` using Streamable HTTP.
-- [ ] Implement both tools by calling the same retrieval/document services as REST.
-- [ ] Write a small MCP client script that connects, lists tools, invokes search, and prints sources.
-- [ ] Run the client against the local server and compare returned sources with REST retrieval.
+- [x] Test tool registration, valid search, document lookup, and invalid argument handling.
+- [x] Mount the official MCP TypeScript SDK Hono integration at `/mcp` using Streamable HTTP.
+- [x] Implement both tools by calling the same retrieval/document services as REST.
+- [x] Write a small MCP client script that connects, lists tools, invokes search, and prints sources.
+- [x] Run the client against the local server and compare returned sources with REST retrieval.
 
 ### 5. Verify and deploy the server
 

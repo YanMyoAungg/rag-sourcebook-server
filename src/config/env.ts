@@ -16,6 +16,9 @@ const envSchema = z.object({
   // Optional at boot; chat answers are reported as "not configured" without it.
   OPENCODE_INFERENCE_API_KEY: z.string().optional(),
   CHAT_MODEL: z.string().default("cat-jam-free"),
+  // Comma-separated hostnames accepted by the MCP endpoint's host-header
+  // validation. Unset: localhost-class hosts only (dev default).
+  MCP_ALLOWED_HOSTS: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

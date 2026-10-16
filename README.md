@@ -50,10 +50,30 @@ generation), and the MCP TypeScript SDK.
 - `POST /api/chat` (JSON `{ question }`) → `{ answer, citations, retrievedChunks }`
 - `/mcp` → MCP Streamable HTTP endpoint with `search_documents` and `get_document` tools
 
+## MCP
+
+The MCP endpoint is stateless Streamable HTTP, mounted with the official
+`@modelcontextprotocol/hono` integration. Both tools call the same services as
+the REST API:
+
+- `search_documents({ query, limit? })` — ranked chunk search with sources.
+- `get_document({ documentId })` — metadata plus the original content.
+
+Smoke-test it against a running server:
+
+```sh
+pnpm exec tsx scripts/mcp-smoke.ts "How does pgvector store embeddings?"
+```
+
+The endpoint enforces host-header validation (DNS-rebinding protection):
+localhost-class hosts by default, or set `MCP_ALLOWED_HOSTS`
+(comma-separated) to the deployed hostname in production.
+
 ## Status
 
 Implemented so far: health route, environment validation, CORS, database
 pools, document ingestion (`POST /api/documents`, `GET /api/documents`) with
-local Transformers.js embeddings and pgvector storage, and grounded chat
-(`POST /api/chat`) with citations and below-threshold abstention. MCP lands in
-the next task (see `PLAN.md`).
+local Transformers.js embeddings and pgvector storage, grounded chat
+(`POST /api/chat`) with citations and below-threshold abstention, and the
+stateless MCP endpoint at `/mcp`. Remaining: provider selection, deployment,
+and deployed smoke tests (Task 5 in `PLAN.md`).

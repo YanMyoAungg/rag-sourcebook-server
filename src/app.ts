@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { env } from "./config/env.js";
+import { createMcpApp } from "./mcp/server.js";
 import { chatRouter } from "./routes/chat.js";
 import { documentsRouter } from "./routes/documents.js";
 
@@ -19,6 +20,8 @@ app.get("/api/health", (c) => c.json({ status: "ok" }));
 app.route("/api", documentsRouter);
 
 app.route("/api", chatRouter);
+
+app.route("/", createMcpApp());
 
 app.notFound((c) => c.json({ error: "not found" }, 404));
 

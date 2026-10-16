@@ -7,6 +7,42 @@ export interface DocumentSummary {
   createdAt: string;
 }
 
+export interface IndexedDocument extends DocumentSummary {
+  content: string;
+}
+
+export async function getDocument(
+  pool: Pool,
+  id: string,
+): Promise<IndexedDocument | null> {
+  const result = await pool.query<{
+    id: string;
+    filename: string;
+    content: string;
+    created_at: Date;
+    chunk_count: number;
+  }>(
+    `SELECT d.id, d.filename, d.content, d.created_at,
+            count(c.id)::int AS chunk_count
+     FROM documents d
+     LEFT JOIN chunks c ON c.metadata->>'documentId' = d.id::text
+     WHERE d.id::text = $1
+     GROUP BY d.id`,
+    [id],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return null;
+  }
+  return {
+    id: row.id,
+    filename: row.filename,
+    content: row.content,
+    chunkCount: row.chunk_count,
+    createdAt: row.created_at.toISOString(),
+  };
+}
+
 export async function insertDocument(
   pool: Pool,
   input: { filename: string; content: string },
