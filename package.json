@@ -12,8 +12,10 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "warm-model": "tsx scripts/warm-model.ts"
   },
+  "packageManager": "pnpm@12.6.0",
   "dependencies": {
     "@hono/node-server": "^2.1.5",
     "@hono/zod-validator": "^0.9.1",

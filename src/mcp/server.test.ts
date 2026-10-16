@@ -7,7 +7,7 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ingestDocument } from "../documents/ingest.js";
 import { createVectorStore } from "../rag/vector-store.js";
-import { createMcpServer } from "./server.js";
+import { createMcpServer, resolveAllowedHosts } from "./server.js";
 import type { McpDeps } from "./server.js";
 
 const TEST_DATABASE_URL =
@@ -140,5 +140,34 @@ describe("MCP server", () => {
 
     expect(result.isError).toBe(true);
     expect(firstText(result)).toMatch(/no document/i);
+  });
+});
+
+describe("resolveAllowedHosts", () => {
+  it("parses a comma-separated list, trimming and dropping empties", () => {
+    expect(
+      resolveAllowedHosts({ MCP_ALLOWED_HOSTS: "a.example, b.example ,, " }),
+    ).toEqual(["a.example", "b.example"]);
+  });
+
+  it("falls back to the platform hostname when the list is unset", () => {
+    expect(
+      resolveAllowedHosts({
+        RENDER_EXTERNAL_HOSTNAME: "rag-sourcebook.onrender.com",
+      }),
+    ).toEqual(["rag-sourcebook.onrender.com"]);
+  });
+
+  it("prefers the explicit list over the platform hostname", () => {
+    expect(
+      resolveAllowedHosts({
+        MCP_ALLOWED_HOSTS: "api.example.com",
+        RENDER_EXTERNAL_HOSTNAME: "x.onrender.com",
+      }),
+    ).toEqual(["api.example.com"]);
+  });
+
+  it("returns undefined when nothing is set", () => {
+    expect(resolveAllowedHosts({})).toBeUndefined();
   });
 });

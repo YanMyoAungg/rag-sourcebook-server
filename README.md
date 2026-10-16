@@ -69,11 +69,40 @@ The endpoint enforces host-header validation (DNS-rebinding protection):
 localhost-class hosts by default, or set `MCP_ALLOWED_HOSTS`
 (comma-separated) to the deployed hostname in production.
 
+## Deployment (Render + Neon)
+
+Target setup: a Render free web service + Neon free PostgreSQL (both $0). The
+free instance spins down after ~15 minutes idle; the next request takes about
+a minute to wake it.
+
+One-time setup:
+
+1. **Neon** — create a project at neon.com and copy the connection string
+   (`postgresql://…?sslmode=require`).
+2. **GitHub** — push this repository to GitHub.
+3. **Render** — create a Blueprint from the repository (`render.yaml` is
+   included). Render prompts for the `sync: false` secrets: `DATABASE_URL`
+   (Neon) and `OPENCODE_INFERENCE_API_KEY`; set `CLIENT_ORIGIN` once the
+   client is deployed.
+4. **Schema** — apply it to the Neon database once:
+   `psql "postgresql://…?sslmode=require" -f src/db/schema.sql`
+5. **Verify** over HTTPS:
+   - `GET https://<service>.onrender.com/api/health`
+   - upload a document (`POST /api/documents`) and ask a question
+     (`POST /api/chat`)
+   - MCP:
+     `MCP_URL=https://<service>.onrender.com/mcp pnpm exec tsx scripts/mcp-smoke.ts "…"`
+
+Build notes: `pnpm warm-model` pre-downloads the embedding model during the
+build so cold starts load it from disk instead of fetching ~100 MB. The MCP
+endpoint's host-header validation uses the service's own hostname on Render;
+set `MCP_ALLOWED_HOSTS` explicitly on other platforms.
+
 ## Status
 
 Implemented so far: health route, environment validation, CORS, database
 pools, document ingestion (`POST /api/documents`, `GET /api/documents`) with
 local Transformers.js embeddings and pgvector storage, grounded chat
 (`POST /api/chat`) with citations and below-threshold abstention, and the
-stateless MCP endpoint at `/mcp`. Remaining: provider selection, deployment,
-and deployed smoke tests (Task 5 in `PLAN.md`).
+stateless MCP endpoint at `/mcp`. Remaining: deployment to Render + Neon and
+the deployed smoke tests (Task 5 in `PLAN.md`; see the Deployment section).

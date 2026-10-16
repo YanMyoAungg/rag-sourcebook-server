@@ -121,19 +121,41 @@ export function createMcpServer(deps: McpDeps = defaultMcpDeps()): McpServer {
 }
 
 /**
+ * Hostnames to accept on the MCP endpoint. `MCP_ALLOWED_HOSTS` wins; on Render
+ * the platform-provided hostname is used automatically; without either, the
+ * integration's localhost-class default stays in effect for local dev.
+ */
+export function resolveAllowedHosts(source: {
+  MCP_ALLOWED_HOSTS?: string;
+  RENDER_EXTERNAL_HOSTNAME?: string;
+}): string[] | undefined {
+  const configured = (source.MCP_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim())
+    .filter((host) => host.length > 0);
+  if (configured.length > 0) {
+    return configured;
+  }
+  const platformHostname = source.RENDER_EXTERNAL_HOSTNAME?.trim();
+  return platformHostname && platformHostname.length > 0
+    ? [platformHostname]
+    : undefined;
+}
+
+/**
  * Hono sub-app with the MCP Streamable HTTP endpoint at /mcp. A fresh server
  * and transport are created per request (stateless). Host-header validation
  * comes from the official integration: localhost-class hosts by default, or
- * the hosts in MCP_ALLOWED_HOSTS when set (needed for deployment).
+ * the hosts named by MCP_ALLOWED_HOSTS / the platform (see
+ * resolveAllowedHosts) when deployed.
  */
 export function createMcpApp(deps: McpDeps = defaultMcpDeps()): Hono {
-  const allowedHosts = env.MCP_ALLOWED_HOSTS?.split(",")
-    .map((host) => host.trim())
-    .filter((host) => host.length > 0);
+  const allowedHosts = resolveAllowedHosts({
+    MCP_ALLOWED_HOSTS: env.MCP_ALLOWED_HOSTS,
+    RENDER_EXTERNAL_HOSTNAME: process.env.RENDER_EXTERNAL_HOSTNAME,
+  });
 
-  const mcpApp = createMcpHonoApp(
-    allowedHosts && allowedHosts.length > 0 ? { allowedHosts } : {},
-  );
+  const mcpApp = createMcpHonoApp(allowedHosts ? { allowedHosts } : {});
 
   mcpApp.all("/mcp", async (c) => {
     const server = createMcpServer(deps);
