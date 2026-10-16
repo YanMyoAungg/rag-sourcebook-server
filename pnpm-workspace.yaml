@@ -1,0 +1,4 @@
+# esbuild's install script is not needed: the platform binary ships as an
+# optional dependency and tsx/vitest run without it (verified).
+allowBuilds:
+  esbuild: false

@@ -36,10 +36,10 @@ The client keeps matching local TypeScript response types; no shared source fold
 
 **Files:** `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `src/app.ts`, `src/index.ts`, `src/db/pool.ts`, `src/db/schema.sql`, `src/config/env.ts`, `.gitignore`, `.env.example`, `README.md`, `vitest.config.ts`.
 
-- [ ] Write a failing health-route test for `GET /api/health` returning status 200 and `{ status: "ok" }`.
-- [ ] Run the focused test and confirm it fails because the route is missing.
-- [ ] Create the Hono Node application with `@hono/node-server`, Zod request/environment validation, restricted CORS middleware, and PostgreSQL configuration; add the minimal health route.
-- [ ] Run `pnpm test`, `pnpm typecheck`, and `pnpm build`.
+- [x] Write a failing health-route test for `GET /api/health` returning status 200 and `{ status: "ok" }`.
+- [x] Run the focused test and confirm it fails because the route is missing.
+- [x] Create the Hono Node application with `@hono/node-server`, Zod request/environment validation, restricted CORS middleware, and PostgreSQL configuration; add the minimal health route.
+- [x] Run `pnpm test`, `pnpm typecheck`, and `pnpm build`.
 
 ### 2. Implement ingestion and pgvector persistence
 
