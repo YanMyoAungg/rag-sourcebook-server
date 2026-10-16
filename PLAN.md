@@ -4,7 +4,7 @@
 
 **Architecture:** This is a standalone Node.js TypeScript project with its own Git history and dependencies. It exposes REST endpoints for the client and an MCP Streamable HTTP endpoint for MCP clients. Both use the same document and retrieval services.
 
-**Stack:** Hono, `@hono/node-server`, `@hono/zod-validator`, Zod, Hono's `cors` middleware, PostgreSQL/pgvector, `pg`, LangChain.js (`@langchain/core`, `@langchain/textsplitters`, `@langchain/pgvector`, `@langchain/openai`), Transformers.js (`@huggingface/transformers`) for local sentence embeddings, an OpenAI-compatible chat provider (Gemini free tier), official MCP TypeScript SDK Hono/server/client/node packages, dotenv, Vitest, pnpm.
+**Stack:** Hono, `@hono/node-server`, `@hono/zod-validator`, Zod, Hono's `cors` middleware, PostgreSQL/pgvector, `pg`, LangChain.js (`@langchain/core`, `@langchain/textsplitters`, `@langchain/pgvector`, `@langchain/openai`), Transformers.js (`@huggingface/transformers`) for local sentence embeddings, an OpenAI-compatible chat provider (OpenRouter free tier), official MCP TypeScript SDK Hono/server/client/node packages, dotenv, Vitest, pnpm.
 
 ## API contract provided
 

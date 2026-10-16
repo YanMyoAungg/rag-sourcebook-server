@@ -8,8 +8,8 @@ returns answers with citations. Part of the `rag-sourcebook` workspace
 ## Stack
 
 Hono on Node.js, TypeScript, Zod, PostgreSQL/pgvector, LangChain.js,
-Transformers.js (local sentence embeddings), OpenCode Inference (answer
-generation), and the MCP TypeScript SDK.
+Transformers.js (local sentence embeddings), an OpenAI-compatible chat
+provider (OpenRouter) for answer generation, and the MCP TypeScript SDK.
 
 ## Setup
 
