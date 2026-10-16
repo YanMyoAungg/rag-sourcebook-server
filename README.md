@@ -5,6 +5,10 @@ stores embeddings in PostgreSQL (pgvector), retrieves relevant chunks, and
 returns answers with citations. Part of the `rag-sourcebook` workspace
 (see `../PLAN.md`); the React frontend lives in `../client`.
 
+By design the frontend is a separate repository. An implementation guide that
+explains the server feature by feature — the architecture, the decisions behind
+it, and the parts that are easy to get wrong — is in [`docs/`](docs/README.md).
+
 ## Stack
 
 Hono on Node.js, TypeScript, Zod, PostgreSQL/pgvector, LangChain.js,
