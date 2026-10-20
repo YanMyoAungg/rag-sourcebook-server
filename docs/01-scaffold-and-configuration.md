@@ -106,10 +106,10 @@ const shutdown = () => {
 };
 ```
 
-There are two pools to release (see [Database and schema](02-database-and-schema.md)),
-and one of them is held by the vector store, so it is closed first. `allSettled`
-rather than `all`: a pool that is already closed must not prevent the process
-from exiting.
+There is the application pool to release, plus the pool the vector store owns
+(see [Database and schema](02-database-and-schema.md)), so the store is closed
+first. `allSettled` rather than `all`: a pool that is already closed must not
+prevent the process from exiting.
 
 ## Decisions and rejected alternatives
 

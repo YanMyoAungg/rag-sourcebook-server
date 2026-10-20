@@ -1,6 +1,6 @@
 import { PGVectorStore } from "@langchain/pgvector";
 import type { Pool } from "pg";
-import { vectorStorePool } from "../db/pool.js";
+import { createPool } from "../db/pool.js";
 import { localEmbeddings } from "./embeddings.js";
 
 /**
@@ -30,20 +30,59 @@ export async function createVectorStore(
 }
 
 let defaultStore: Promise<PGVectorStore> | undefined;
+const ended = new WeakSet<PGVectorStore>();
+
+async function endStore(store: PGVectorStore): Promise<void> {
+  if (ended.has(store)) {
+    return;
+  }
+  ended.add(store);
+  await store.end();
+}
+
+/**
+ * The store holds a checked-out client for its whole lifetime. Neon closes idle
+ * connections when its compute suspends, which kills that client; the store
+ * can then no longer query. A lost connection drops the cached store so the
+ * next request opens a fresh one over a fresh pool.
+ */
+async function openStore(): Promise<PGVectorStore> {
+  const storePool = createPool("vector store");
+  let store: PGVectorStore;
+  try {
+    store = await createVectorStore(storePool);
+  } catch (error) {
+    // initialize() may have connected before it failed. End the pool in the
+    // background rather than blocking the error on a client it never released.
+    void storePool.end().catch(() => undefined);
+    throw error;
+  }
+
+  const pending = defaultStore;
+  store.client?.on("error", () => {
+    if (defaultStore === pending) {
+      defaultStore = undefined;
+    }
+    void endStore(store).catch((error) => {
+      console.error("vector store: failed to close a dead store", error);
+    });
+  });
+
+  return store;
+}
 
 /** Lazily initialized store bound to the application's database. */
 export function getVectorStore(): Promise<PGVectorStore> {
-  defaultStore ??= createVectorStore(vectorStorePool);
+  defaultStore ??= openStore();
   return defaultStore;
 }
 
-/** Releases the store's held client and pool (or the idle pool if unused). */
+/** Releases the store's held client and the pool it owns. */
 export async function closeVectorStore(): Promise<void> {
   const store = defaultStore;
   defaultStore = undefined;
-  if (store) {
-    await (await store).end();
-  } else {
-    await vectorStorePool.end();
+  if (store === undefined) {
+    return;
   }
+  await endStore(await store);
 }

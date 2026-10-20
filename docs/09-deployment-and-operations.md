@@ -37,7 +37,7 @@ services:
       - key: CHAT_BASE_URL
         value: https://openrouter.ai/api/v1
       - key: CHAT_MODEL
-        value: nvidia/nemotron-3-super-120b-a12b:free
+        value: nvidia/nemotron-3.5-lightning:free
       - key: EMBEDDING_MODEL
         value: Xenova/all-MiniLM-L6-v2
 ```
@@ -69,7 +69,7 @@ Line by line:
 | `CLIENT_ORIGIN` | `https://rag-sourcebook-client.vercel.app` | Render dashboard (secret) |
 | `CHAT_BASE_URL` | `https://openrouter.ai/api/v1` | `render.yaml` |
 | `CHAT_API_KEY` | an OpenRouter key | Render dashboard (secret) |
-| `CHAT_MODEL` | `nvidia/nemotron-3-super-120b-a12b:free` | `render.yaml` |
+| `CHAT_MODEL` | `nvidia/nemotron-3.5-lightning:free` | `render.yaml` |
 | `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | `render.yaml` |
 | `MCP_ALLOWED_HOSTS` | not set | `RENDER_EXTERNAL_HOSTNAME` is used automatically |
 
@@ -162,12 +162,13 @@ cannot burn the daily quota.
 - **Neon, not a Render-managed database.** Neon's free tier is permanent rather
   than trial-based, supports `pgvector`, and gives an external `psql` connection
   for the one-time schema step.
-- **A direct connection for the vector store.** `PGVectorStore` holds one client
-  for the process's lifetime and calls `end()` on the pool it was given
-  ([Database and schema](02-database-and-schema.md)); a connection pooler that
-  recycles server-side connections is a poor fit for a client that intends to
-  hold one open. The application `pool` still opens and closes connections as
-  needed.
+- **A replaceable connection for the vector store.** `PGVectorStore` holds one
+  client for the process's lifetime and calls `end()` on the pool it was given
+  ([Database and schema](02-database-and-schema.md)); Neon closes idle
+  connections when its compute suspends, and a pooler may recycle one sooner. A
+  lost connection drops the cached store and logs it, and the next request opens
+  a fresh one — it is not treated as fatal. The application `pool` still opens
+  and closes connections as needed.
 - **Pin the model in `render.yaml`, keep the key a secret.** The model id is not
   sensitive and belongs in reviewable configuration; the key is only ever in the
   dashboard.

@@ -118,7 +118,9 @@ chatRouter.post(
         const failure = describeChatFailure(error);
         await stream.writeSSE({
           event: "error",
-          data: JSON.stringify({ message: failure.message }),
+          // The SSE event name is not part of the payload, so the data carries
+          // the same `type` discriminator as every other AnswerEvent.
+          data: JSON.stringify({ type: "error", message: failure.message }),
         });
       } finally {
         clearInterval(heartbeat);

@@ -250,6 +250,27 @@ describe("POST /api/chat/stream", () => {
     expect(body).toContain("answer generation failed");
   });
 
+  it("sends the error event as a typed AnswerEvent, not just a message", async () => {
+    streamAnswerMock.mockReturnValue(
+      failsWith(new ChatGenerationError("answer generation failed")),
+    );
+
+    const res = await postStream({ question: "hello" });
+    const body = await res.text();
+    const data = body
+      .split("\n")
+      .find((line) => line.startsWith("data:"))
+      ?.slice("data:".length)
+      .trim();
+
+    // The client dispatches on `type`; a message without one is dropped and
+    // used to white-screen the page.
+    expect(JSON.parse(data ?? "")).toEqual({
+      type: "error",
+      message: "answer generation failed",
+    });
+  });
+
   it("reports an unconfigured model as an error event", async () => {
     streamAnswerMock.mockReturnValue(
       failsWith(new ChatModelNotConfiguredError("chat model is not configured")),

@@ -71,24 +71,24 @@ different width would fail on insert with a dimension mismatch rather than
 migrating the column. That failure is loud and immediate, which is the intent —
 it is why the model is documented as requiring a re-index.
 
-### The two pools
+### The database pools
+
+There is one application pool:
 
 ```ts
-export const pool = new Pool({ connectionString: env.DATABASE_URL });
-
-/**
- * Dedicated pool for the pgvector store. PGVectorStore holds one checked-out
- * client for its whole lifetime and its end() terminates the entire pool, so
- * it must not share the application pool.
- */
-export const vectorStorePool = new Pool({ connectionString: env.DATABASE_URL });
+export const pool = createPool("database");
 ```
 
-`pool` serves ordinary queries (insert a document, list documents, count chunks,
-fetch one document). `vectorStorePool` is handed to `PGVectorStore.initialize`
-and never used for anything else. If the store shared `pool`, calling the
-store's `end()` — which happens during shutdown — would terminate connections
-the rest of the app is still using.
+`createPool` attaches the listeners `pg` needs to *report* a lost connection. `pg-pool` removes its own `error` listener while a client is checked out, so a socket reset would otherwise be an unhandled `'error'` event and end the process. Idle clients are re-emitted on the pool; checked-out clients only on the client, so both are covered.
+
+The vector store gets a pool of its own, created with the store:
+
+```ts
+const storePool = createPool("vector store");
+const store = await createVectorStore(storePool);
+```
+
+`PGVectorStore` checks out one client for its whole lifetime — it does not use it for queries, but it holds it — and `end()` terminates the pool it was given. That is why it cannot share the application pool. Neon closes idle connections when its compute suspends, so the held client eventually dies; the store watches that client, logs the loss, and drops the cached store, and the next request opens a fresh one. The rest of the app's queries acquire and release clients through `pool` as usual.
 
 ### Reads that count chunks
 
@@ -166,7 +166,9 @@ for exactly this reason ([Document ingestion](04-document-ingestion.md)).
 **Why is there a separate pool just for the vector store?**
 Because `PGVectorStore` holds one client for its lifetime and its `end()`
 terminates the pool it was given. Sharing the application pool would mean
-shutting down the store kills unrelated queries.
+shutting down the store kills unrelated queries. The store's pool is created
+with the store, so a lost connection can also be replaced by building a new
+store rather than leaving the process with a dead client.
 
 **What happens if the same document is uploaded twice?**
 Two rows, two sets of chunks, no deduplication. Documents are immutable and

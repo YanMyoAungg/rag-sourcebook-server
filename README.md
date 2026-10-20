@@ -44,7 +44,7 @@ provider (OpenRouter) for answer generation, and the MCP TypeScript SDK.
 | `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | Local Transformers.js embedding model (384 dimensions; changing it requires a schema update and re-index) |
 | `CHAT_BASE_URL` | – | OpenAI-compatible chat endpoint. No vendor default: unset means chat reports 503 |
 | `CHAT_API_KEY` | – | Provider API key; chat answers report 503 while unset |
-| `CHAT_MODEL` | – | Model ID; currently `nvidia/nemotron-3-super-120b-a12b:free` (OpenRouter) |
+| `CHAT_MODEL` | – | Model ID; currently `nvidia/nemotron-3.5-lightning:free` (OpenRouter) |
 
 ### Generation provider
 

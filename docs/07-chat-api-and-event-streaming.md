@@ -81,7 +81,10 @@ chatRouter.post("/chat/stream", zValidator("json", chatSchema, …), async (c) =
     } catch (error) {
       if (controller.signal.aborted) return;   // the client hung up; nobody to report to
       const failure = describeChatFailure(error);
-      await stream.writeSSE({ event: "error", data: JSON.stringify({ message: failure.message }) });
+      await stream.writeSSE({
+        event: "error",
+        data: JSON.stringify({ type: "error", message: failure.message }),
+      });
     } finally {
       clearInterval(heartbeat);
     }
@@ -158,9 +161,9 @@ function describeChatFailure(error: unknown): ChatFailure {
 | `ChatGenerationError` | 502 | `"answer generation failed"` | the provider failed, timed out, or returned nothing |
 | anything else | 500 | `"internal server error"` | a bug |
 
-The streaming route reports the same four cases as `{ message }` in an `error`
-event, using the same function — so the status semantics and the wording are
-defined once. The two generation failures are logged with the full error (a
+The streaming route reports the same four cases as
+`{ type: "error", message }` in an `error` event, using the same function — so
+the status semantics and the wording are defined once. The two generation failures are logged with the full error (a
 provider body or a stack) because the client only ever sees the safe message.
 
 ## Decisions and rejected alternatives
