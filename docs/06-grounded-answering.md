@@ -149,11 +149,11 @@ validation is about existence, not entailment.
 ```ts
 const CHAT_TIMEOUT_MS = 45_000;
 // Reasoning models spend part of this budget on hidden reasoning before any
-// content is emitted, so it must cover reasoning + answer. Too small a budget
-// returns an empty answer rather than a short one (verified against OpenRouter
-// free reasoning models, which returned content: null at max_tokens 60 and a
-// complete cited answer at 800).
-const MAX_ANSWER_TOKENS = 800;
+// content is emitted, so it must cover reasoning + answer. The free router can
+// pick a reasoning-heavy model, and a large evidence prompt can consume 800
+// tokens before any content arrives (finish_reason: length, content: null), so
+// leave enough headroom for the cited answer.
+const MAX_ANSWER_TOKENS = 2000;
 
 defaultModel ??= new ChatOpenAI({
   model: config.model, apiKey: config.apiKey,
@@ -170,7 +170,7 @@ Five settings, each with a reason:
 | Setting | Value | Why |
 | --- | --- | --- |
 | `temperature` | `0` | This is extraction from provided evidence, not writing. Determinism makes a failing answer reproducible. |
-| `maxTokens` | `800` | Large enough for a reasoning model's hidden reasoning *plus* a three-sentence cited answer; 60 was measured returning empty content. |
+| `maxTokens` | `2000` | Covers a reasoning model's hidden reasoning *plus* a three-sentence cited answer. The free router can pick a reasoning-heavy model, and 800 was measured leaving no content on larger prompts. |
 | `timeout` | `45 s` | A ceiling on one model call, independent of the SSE heartbeat that keeps the connection warm. |
 | `maxRetries` | `1` | One retry for a transient provider error. Worst case is two full timeouts. |
 | `temperature`/`baseURL`/`user-agent` | provider-agnostic | Only `CHAT_BASE_URL`, `CHAT_API_KEY`, and `CHAT_MODEL` decide who answers. OpenRouter is today's value, not a dependency. |
@@ -264,11 +264,12 @@ delivery.
 
 ## Where it can bite you
 
-- **Reasoning models can eat the whole budget.** The 800-token ceiling must
-  cover hidden reasoning *and* the answer. A reasoning model configured with a
-  smaller budget returns `content: null` — which this code correctly reports as
-  `500`/502 "answer generation failed" rather than an empty answer, but the
-  symptom looks like a broken provider rather than a budget that is too small.
+- **Reasoning models can eat the whole budget.** The 2000-token ceiling must
+  cover hidden reasoning *and* the answer. The free router can select a
+  reasoning-heavy model; a smaller budget returns `content: null` — which this
+  code correctly reports as `500`/502 "answer generation failed" rather than an
+  empty answer, but the symptom looks like a broken provider rather than a
+  budget that is too small.
 - **Citation validation is range-based, not entailment-based.** A model that
   writes `[chunk-3]` where `[chunk-1]` was the supporting passage produces a
   citation to a real but wrong chunk. The check catches invented numbers, not

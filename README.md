@@ -44,7 +44,7 @@ provider (OpenRouter) for answer generation, and the MCP TypeScript SDK.
 | `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | Local Transformers.js embedding model (384 dimensions; changing it requires a schema update and re-index) |
 | `CHAT_BASE_URL` | – | OpenAI-compatible chat endpoint. No vendor default: unset means chat reports 503 |
 | `CHAT_API_KEY` | – | Provider API key; chat answers report 503 while unset |
-| `CHAT_MODEL` | – | Model ID; currently `nvidia/nemotron-3.5-lightning:free` (OpenRouter) |
+| `CHAT_MODEL` | – | Model ID; currently `openrouter/free` (OpenRouter's free-model router) |
 
 ### Generation provider
 
@@ -59,11 +59,11 @@ not use it). The current setup is OpenRouter's free tier:
   cap to 1000. The deployed service shares that quota with local runs.
 - Free models are logged by their providers and may be used to train them — fine
   for demo documents, not for anything confidential.
-- Pin a specific model rather than the `openrouter/free` router, which picks a
-  different model per request and makes answers non-reproducible. Reasoning
-  models spend part of the 800-token answer budget on hidden reasoning before
-  emitting content; below that budget they return an empty answer, which the
-  server reports as a generation failure (502).
+- Use the `openrouter/free` router so a request is served by whichever free
+  model is available instead of failing when a pinned model's provider is down.
+  The trade-off is that the model varies per request, so answer style is less
+  reproducible. Reasoning models can spend most of the token budget on hidden
+  reasoning; the server allows 2000 tokens so they still emit the cited answer.
 
 ## API contract
 

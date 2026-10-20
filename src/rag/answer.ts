@@ -86,11 +86,11 @@ export interface AnswerDeps {
 
 const CHAT_TIMEOUT_MS = 45_000;
 // Reasoning models spend part of this budget on hidden reasoning before any
-// content is emitted, so it must cover reasoning + answer. Too small a budget
-// returns an empty answer rather than a short one (verified against OpenRouter
-// free reasoning models, which returned content: null at max_tokens 60 and a
-// complete cited answer at 800).
-const MAX_ANSWER_TOKENS = 800;
+// content is emitted, so it must cover reasoning + answer. The free router can
+// pick a reasoning-heavy model, and a large evidence prompt can consume 800
+// tokens before any content arrives (finish_reason: length, content: null), so
+// leave enough headroom for the cited answer.
+const MAX_ANSWER_TOKENS = 2000;
 const APP_USER_AGENT = "rag-sourcebook-server/0.1.0";
 const CITATION_PATTERN = /\[chunk-(\d+)\]/g;
 const TOOL_STEP_ID = "step-1";

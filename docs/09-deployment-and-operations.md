@@ -37,7 +37,7 @@ services:
       - key: CHAT_BASE_URL
         value: https://openrouter.ai/api/v1
       - key: CHAT_MODEL
-        value: nvidia/nemotron-3.5-lightning:free
+        value: openrouter/free
       - key: EMBEDDING_MODEL
         value: Xenova/all-MiniLM-L6-v2
 ```
@@ -69,7 +69,7 @@ Line by line:
 | `CLIENT_ORIGIN` | `https://rag-sourcebook-client.vercel.app` | Render dashboard (secret) |
 | `CHAT_BASE_URL` | `https://openrouter.ai/api/v1` | `render.yaml` |
 | `CHAT_API_KEY` | an OpenRouter key | Render dashboard (secret) |
-| `CHAT_MODEL` | `nvidia/nemotron-3.5-lightning:free` | `render.yaml` |
+| `CHAT_MODEL` | `openrouter/free` | `render.yaml` |
 | `EMBEDDING_MODEL` | `Xenova/all-MiniLM-L6-v2` | `render.yaml` |
 | `MCP_ALLOWED_HOSTS` | not set | `RENDER_EXTERNAL_HOSTNAME` is used automatically |
 
@@ -225,11 +225,13 @@ memory (seconds). The download is already done, because the build fetched it.
 The chat model client is also constructed on first use, but that is a cheap
 object.
 
-**Why 800 tokens when the answer is at most three sentences?**
+**Why 2000 tokens when the answer is at most three sentences?**
 Because the budget must cover a reasoning model's hidden reasoning *before* its
-first content token. At 60 the provider returned `content: null`; at 800 the same
-model returned a complete cited answer. The number is a measurement, recorded in
-`answer.ts` ([Grounded answering](06-grounded-answering.md)).
+first content token. The free router can pick a reasoning-heavy model, and a
+large evidence prompt can spend the whole 800-token budget before emitting any
+content (`finish_reason: length`, `content: null`). 2000 leaves headroom for the
+cited answer. The measurement is recorded in `answer.ts`
+([Grounded answering](06-grounded-answering.md)).
 
 **How would you deploy this with authentication?**
 Add a bearer-token check to `/api/*` and `/mcp` before the routers, keep the token
@@ -245,7 +247,8 @@ on a free instance.
 
 **Where is the deploy's own branch configured?**
 In the Render dashboard, not in `render.yaml` (the blueprint does not pin one).
-That is the one piece of deployment state this repository cannot show you.
+It is currently set to `main`. That is the one piece of deployment state this
+repository cannot show you.
 
 ## Related
 
